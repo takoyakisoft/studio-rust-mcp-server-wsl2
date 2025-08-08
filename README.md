@@ -11,8 +11,8 @@ wget -O Linux-rbx-studio-mcp.zip https://github.com/user-attachments/files/21680
 unzip Linux-rbx-studio-mcp.zip
 rm Linux-rbx-studio-mcp.zip 
 
-sudo mv ./rbx-studio-mcp /usr/local/bin/
-sudo chmod +x /usr/local/bin/rbx-studio-mcp
+sudo mv ./rbx-studio-mcp /usr/local/bin/rbx-studio-mcp-linux
+sudo chmod +x /usr/local/bin/rbx-studio-mcp-linux
 ```
 
 ## WSL2 Mirrored Mode Networking 
@@ -28,6 +28,6 @@ networkingMode=mirrored
  ~/.codex/config.toml:
 ```toml
 [mcp_servers.roblox-studio]  
-command = "rbx-studio-mcp"  
+command = "rbx-studio-mcp-linux"  
 args = ["--stdio"]  
 ```
