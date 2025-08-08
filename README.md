@@ -76,6 +76,19 @@ To build and install the MCP reference implementation from this repository's sou
 After the command completes, the Studio MCP Server is installed and ready for your prompts from
 Claude Desktop.
 
+## WSL2 Mirrored Mode Networking (Optional, for WSL2 Users)
+
+If you're running the MCP Server inside **WSL2 (Ubuntu 24.04)** and need it to communicate seamlessly with **Roblox Studio on the Windows host**, enabling **Mirrored Mode Networking** can significantly simplify setup.
+
+### What is Mirrored Mode Networking?
+
+On Windows 11 (version 22H2 or later), WSL2 can mirror the Windows network interfaces into the Linux environment by adding the following to your `~/.wslconfig` file (in Windows user home):
+
+```ini
+[wsl2]
+networkingMode=mirrored
+```
+
 ## Verify setup
 
 To make sure everything is set up correctly, follow these steps:
