@@ -17,7 +17,7 @@ sudo chmod +x /usr/local/bin/rbx-studio-mcp
 
 ## WSL2 Mirrored Mode Networking 
 
-C:\Users\<user>\.wslconfig:
+C:\Users\\<user\>\\.wslconfig:
 ```ini
 [wsl2]
 networkingMode=mirrored
