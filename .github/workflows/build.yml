@@ -1,12 +1,11 @@
 name: Build
 
 on:
-  - push
-  - pull_request
-    
+  workflow_dispatch
+
 env:
   CARGO_PKG_VERSION: "0.2.${{ github.run_number }}"
-  
+
 permissions:
   contents: write
 
@@ -20,7 +19,7 @@ jobs:
           cargo install cargo-bundle cargo-edit
           cargo set-version --workspace "$CARGO_PKG_VERSION"
           rustup target add x86_64-apple-darwin aarch64-apple-darwin
-          cargo build --release --target aarch64-apple-darwin  --target x86_64-apple-darwin
+          cargo build --release --target aarch64-apple-darwin --target x86_64-apple-darwin
           cargo bundle --release --target aarch64-apple-darwin
           lipo -create target/aarch64-apple-darwin/release/rbx-studio-mcp target/x86_64-apple-darwin/release/rbx-studio-mcp -output "target/aarch64-apple-darwin/release/bundle/osx/RobloxStudioMCP.app/Contents/MacOS/rbx-studio-mcp"
       - name: Sign and Notarize macOS binary
@@ -47,6 +46,7 @@ jobs:
           cargo set-version --workspace "$CARGO_PKG_VERSION"
           mkdir output
           cargo build --release
+          cp target/release/rbx-studio-mcp output/rbx-studio-mcp.exe
       - name: Sign windows binary
         run: ./util/sign.windows.ps1
         env:
@@ -60,10 +60,28 @@ jobs:
           name: Windows-rbx-studio-mcp
           path: output/rbx-studio-mcp.exe
 
+  ### ✅ Linux用の新しいジョブを追加
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Linux binary
+        run: |
+          cargo install cargo-edit
+          cargo set-version --workspace "$CARGO_PKG_VERSION"
+          mkdir -p output
+          cargo build --release
+          cp target/release/rbx-studio-mcp output/rbx-studio-mcp
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux-rbx-studio-mcp
+          path: output/rbx-studio-mcp
+
   release:
     runs-on: ubuntu-latest
-    if:  ${{ github.ref_name == github.event.repository.default_branch }}
-    needs: [build-macos, build-windows]
+    if: ${{ github.ref_name == github.event.repository.default_branch }}
+    needs: [build-macos, build-windows, build-linux]
     steps:
       - run: mkdir -p output
       - uses: actions/download-artifact@v4
@@ -74,5 +92,5 @@ jobs:
         uses: Roblox-ActionsCache/softprops-action-gh-release@v1
         with:
           tag_name: v${{ env.CARGO_PKG_VERSION }}
-          release_name: Release v${{ env.CARGO_PKG_VERSION }} }}
+          release_name: Release v${{ env.CARGO_PKG_VERSION }}
           files: output/*
