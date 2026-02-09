@@ -6,21 +6,22 @@ on:
     branches:
       - linux-wsl2-build
 
-env:
-  CARGO_PKG_VERSION: "0.2.${{ github.run_number }}"
-
 permissions:
   contents: write
 
 jobs:
   build-linux:
     runs-on: ubuntu-latest
+    outputs:
+      version_num: ${{ steps.get_version.outputs.version_num }}
+      version_tag: ${{ steps.get_version.outputs.version_tag }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # Fetch all history to retrieve version tags
 
       - name: Get Upstream Version
+        id: get_version
         run: |
           git remote add upstream https://github.com/Roblox/studio-rust-mcp-server.git
           git fetch upstream --tags
@@ -31,16 +32,14 @@ jobs:
 
           echo "Detected upstream version: $VERSION_NUM ($VERSION_TAG)"
 
-          # If the tag cannot be retrieved (v0.0.0), we could fallback to using date or commit hash,
-          # but we assume upstream always has a tag.
-          # We considered adding +wsl2 to indicate a custom build,
-          # but the user requested to match the version number exactly.
-
+          echo "version_num=$VERSION_NUM" >> $GITHUB_OUTPUT
+          echo "version_tag=$VERSION_TAG" >> $GITHUB_OUTPUT
           echo "CARGO_PKG_VERSION=$VERSION_NUM" >> $GITHUB_ENV
 
       - name: Build Linux binary
         run: |
           cargo install cargo-edit
+          # Use env var set in previous step
           cargo set-version --workspace "$CARGO_PKG_VERSION"
           mkdir -p output
           cargo build --release
@@ -66,8 +65,13 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ env.CARGO_PKG_VERSION }}
-          name: Release v${{ env.CARGO_PKG_VERSION }}
+          tag_name: ${{ needs.build-linux.outputs.version_tag }}
+          name: Release ${{ needs.build-linux.outputs.version_tag }} (Linux)
+          body: |
+            This is an automated build for Linux (WSL2) from the [upstream repository](https://github.com/Roblox/studio-rust-mcp-server).
+
+            **Upstream Version:** ${{ needs.build-linux.outputs.version_tag }}
+            **Build Branch:** linux-wsl2-build
           files: output/*
           draft: false
           prerelease: false
