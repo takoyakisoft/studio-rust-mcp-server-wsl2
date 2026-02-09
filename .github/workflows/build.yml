@@ -67,7 +67,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.CARGO_PKG_VERSION }}
-          release_name: Release v${{ env.CARGO_PKG_VERSION }}
+          name: Release v${{ env.CARGO_PKG_VERSION }}
           files: output/*
           draft: false
           prerelease: false
