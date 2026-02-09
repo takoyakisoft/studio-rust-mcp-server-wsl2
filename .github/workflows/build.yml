@@ -1,7 +1,10 @@
 name: Build
 
 on:
-  workflow_dispatch
+  workflow_dispatch:
+  push:
+    branches:
+      - linux-wsl2-build
 
 env:
   CARGO_PKG_VERSION: "0.2.${{ github.run_number }}"
@@ -80,7 +83,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    if: ${{ github.ref_name == github.event.repository.default_branch }}
+    if: ${{ github.ref_name == 'linux-wsl2-build' || github.ref_name == github.event.repository.default_branch }}
     needs: [build-macos, build-windows, build-linux]
     steps:
       - run: mkdir -p output

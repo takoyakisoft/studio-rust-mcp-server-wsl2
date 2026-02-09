@@ -1,0 +1,43 @@
+name: Upstream Sync
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # 毎日 UTC 0:00 (日本時間 9:00)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: linux-wsl2-build
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Add Upstream and Fetch
+        run: |
+          git remote add upstream https://github.com/Roblox/studio-rust-mcp-server.git
+          git fetch upstream
+
+      - name: Merge Upstream Changes
+        run: |
+          echo "Merging upstream/main into linux-wsl2-build..."
+          if git merge upstream/main --no-edit; then
+            echo "Merge successful."
+          else
+            echo "Merge conflict detected."
+            exit 1
+          fi
+
+      - name: Push Changes
+        run: git push origin linux-wsl2-build
