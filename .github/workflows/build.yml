@@ -17,6 +17,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history to retrieve version tags
+
+      - name: Get Upstream Version
+        run: |
+          git remote add upstream https://github.com/Roblox/studio-rust-mcp-server.git
+          git fetch upstream --tags
+          # Get the latest accessible tag from upstream/main
+          VERSION_TAG=$(git describe --tags --abbrev=0 upstream/main 2>/dev/null || echo "v0.0.0")
+          # Remove 'v' prefix
+          VERSION_NUM=${VERSION_TAG#v}
+
+          echo "Detected upstream version: $VERSION_NUM ($VERSION_TAG)"
+
+          # If the tag cannot be retrieved (v0.0.0), we could fallback to using date or commit hash,
+          # but we assume upstream always has a tag.
+          # We considered adding +wsl2 to indicate a custom build,
+          # but the user requested to match the version number exactly.
+
+          echo "CARGO_PKG_VERSION=$VERSION_NUM" >> $GITHUB_ENV
+
       - name: Build Linux binary
         run: |
           cargo install cargo-edit
@@ -33,7 +54,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    # リリース作成条件: linux-wsl2-build ブランチ
+    # Release creation condition: linux-wsl2-build branch
     if: ${{ github.ref_name == 'linux-wsl2-build' }}
     needs: [build-linux]
     steps:

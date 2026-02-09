@@ -2,7 +2,7 @@ name: Upstream Sync
 
 on:
   schedule:
-    - cron: "0 0 * * *" # 毎日 UTC 0:00 (日本時間 9:00)
+    - cron: "0 0 * * *" # Daily at 0:00 UTC
   workflow_dispatch:
 
 permissions:
@@ -31,40 +31,39 @@ jobs:
 
       - name: Merge Upstream Changes
         run: |
-          # GitHub Workflow関連ファイルは自分の変更を優先する (ours)
+          # Prioritize local changes for GitHub Workflow files (ours)
           git checkout linux-wsl2-build .github/workflows/build.yml
           git checkout linux-wsl2-build .github/workflows/checks.yml
           git checkout linux-wsl2-build README.md
 
-          # それ以外は本家の変更を取り込むためにマージを試みる
-          # コンフリクトが起きた場合は、こちらの変更（Workflowの設定）を優先しつつ、コードの変更は取り込みたい
-          # ここでは単純なマージではなく、特定のファイルを除外してマージする戦略をとるか、
-          # あるいはコンフリクト時にoursを選択するように設定する
+          # Attempt merge to incorporate upstream changes for other files
+          # If conflicts occur, prioritize our changes (Workflow settings) while incorporating code changes
+          # We use a strategy to merge excluding specific files or choosing 'ours' on conflict
 
           echo "Merging upstream/main into linux-wsl2-build..."
 
-          # マージ実行。コンフリクトが発生しても、指定ファイルは後で上書きして修正する
-          set +e # エラーでも止まらないようにする
+          # Execute merge. Even if conflicts occur, specified files will be overwritten/fixed later
+          set +e # Do not stop on error
           git merge upstream/main --no-commit --no-ff
           MERGE_EXIT_CODE=$?
           set -e
 
           if [ $MERGE_EXIT_CODE -ne 0 ]; then
              echo "Merge conflict detected. resolving..."
-             # コンフリクトしているが、build.ymlとchecks.ymlは自分たちのものを使う
+             # Resolving conflicts: keep our version of build.yml and checks.yml
              git checkout HEAD -- .github/workflows/build.yml || true
              git checkout HEAD -- .github/workflows/checks.yml || true
              git checkout HEAD -- README.md || true
              
-             # その他のファイルのコンフリクトはそのままエラーにする（手動介入が必要）
-             # しかし、Workflowファイル以外でコンフリクトが起きることは稀と想定
-             # もし起これば自動コミットできないので、ここではaddしてcommitを試みる
+             # Treat other file conflicts as errors (manual intervention required)
+             # Conflicts outside of Workflow files are expected to be rare
+             # If they occur, auto-commit isn't possible, so we try to add and commit here
              
              git add .github/workflows/build.yml
              git add .github/workflows/checks.yml
              git add README.md
              
-             # 他にコンフリクトが残っていないか確認
+             # Check if any other conflicts remain
              if git diff --name-only --diff-filter=U | grep .; then
                echo "Unresolved conflicts in other files."
                exit 1
@@ -72,9 +71,9 @@ jobs:
              
              git commit -m "Merge upstream/main into linux-wsl2-build (Auto-resolved conflicts)"
           else
-             # コンフリクトなし、または自動解決済み
+             # No conflicts or auto-resolved
              echo "Merge successful (or no conflicts)."
-             # もしno-commitで止めているならコミットする
+             # Commit if stopped by no-commit
              git commit -m "Merge upstream/main into linux-wsl2-build" || echo "Nothing to commit"
           fi
 
