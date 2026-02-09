@@ -31,12 +31,48 @@ jobs:
 
       - name: Merge Upstream Changes
         run: |
+          # GitHub Workflow関連ファイルは自分の変更を優先する (ours)
+          git checkout linux-wsl2-build .github/workflows/build.yml
+          git checkout linux-wsl2-build .github/workflows/checks.yml
+
+          # それ以外は本家の変更を取り込むためにマージを試みる
+          # コンフリクトが起きた場合は、こちらの変更（Workflowの設定）を優先しつつ、コードの変更は取り込みたい
+          # ここでは単純なマージではなく、特定のファイルを除外してマージする戦略をとるか、
+          # あるいはコンフリクト時にoursを選択するように設定する
+
           echo "Merging upstream/main into linux-wsl2-build..."
-          if git merge upstream/main --no-edit; then
-            echo "Merge successful."
+
+          # マージ実行。コンフリクトが発生しても、指定ファイルは後で上書きして修正する
+          set +e # エラーでも止まらないようにする
+          git merge upstream/main --no-commit --no-ff
+          MERGE_EXIT_CODE=$?
+          set -e
+
+          if [ $MERGE_EXIT_CODE -ne 0 ]; then
+             echo "Merge conflict detected. resolving..."
+             # コンフリクトしているが、build.ymlとchecks.ymlは自分たちのものを使う
+             git checkout HEAD -- .github/workflows/build.yml || true
+             git checkout HEAD -- .github/workflows/checks.yml || true
+             
+             # その他のファイルのコンフリクトはそのままエラーにする（手動介入が必要）
+             # しかし、Workflowファイル以外でコンフリクトが起きることは稀と想定
+             # もし起これば自動コミットできないので、ここではaddしてcommitを試みる
+             
+             git add .github/workflows/build.yml
+             git add .github/workflows/checks.yml
+             
+             # 他にコンフリクトが残っていないか確認
+             if git diff --name-only --diff-filter=U | grep .; then
+               echo "Unresolved conflicts in other files."
+               exit 1
+             fi
+             
+             git commit -m "Merge upstream/main into linux-wsl2-build (Auto-resolved conflicts)"
           else
-            echo "Merge conflict detected."
-            exit 1
+             # コンフリクトなし、または自動解決済み
+             echo "Merge successful (or no conflicts)."
+             # もしno-commitで止めているならコミットする
+             git commit -m "Merge upstream/main into linux-wsl2-build" || echo "Nothing to commit"
           fi
 
       - name: Push Changes
