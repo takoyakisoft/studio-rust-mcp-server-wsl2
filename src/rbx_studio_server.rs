@@ -107,9 +107,35 @@ struct InsertModel {
 }
 
 #[derive(Debug, Deserialize, Serialize, schemars::JsonSchema, Clone)]
+struct GetConsoleOutput {}
+
+#[derive(Debug, Deserialize, Serialize, schemars::JsonSchema, Clone)]
+struct GetStudioMode {}
+
+#[derive(Debug, Deserialize, Serialize, schemars::JsonSchema, Clone)]
+struct StartStopPlay {
+    #[schemars(description = "Mode to start or stop, must be start_play, stop, or run_server")]
+    mode: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, schemars::JsonSchema, Clone)]
+struct RunScriptInPlayMode {
+    #[schemars(description = "Code to run")]
+    code: String,
+    #[schemars(description = "Timeout in seconds, defaults to 100 seconds")]
+    timeout: Option<u32>,
+    #[schemars(description = "Mode to run in, must be start_play or run_server")]
+    mode: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, schemars::JsonSchema, Clone)]
 enum ToolArgumentValues {
     RunCode(RunCode),
     InsertModel(InsertModel),
+    GetConsoleOutput(GetConsoleOutput),
+    StartStopPlay(StartStopPlay),
+    RunScriptInPlayMode(RunScriptInPlayMode),
+    GetStudioMode(GetStudioMode),
 }
 #[tool_router]
 impl RBXStudioServer {
@@ -139,6 +165,47 @@ impl RBXStudioServer {
         Parameters(args): Parameters<InsertModel>,
     ) -> Result<CallToolResult, ErrorData> {
         self.generic_tool_run(ToolArgumentValues::InsertModel(args))
+            .await
+    }
+
+    #[tool(description = "Get the console output from Roblox Studio.")]
+    async fn get_console_output(
+        &self,
+        Parameters(args): Parameters<GetConsoleOutput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        self.generic_tool_run(ToolArgumentValues::GetConsoleOutput(args))
+            .await
+    }
+
+    #[tool(description = "Start or stop play mode or run the server.")]
+    async fn start_stop_play(
+        &self,
+        Parameters(args): Parameters<StartStopPlay>,
+    ) -> Result<CallToolResult, ErrorData> {
+        self.generic_tool_run(ToolArgumentValues::StartStopPlay(args))
+            .await
+    }
+
+    #[tool(
+        description = "Run a script in play mode and automatically stop play after script finishes or timeout. Returns the output of the script.
+        Result format: { success: boolean, value: string, error: string, logs: { level: string, message: string, ts: number }[], errors: { level: string, message: string, ts: number }[], duration: number, isTimeout: boolean }"
+    )]
+    async fn run_script_in_play_mode(
+        &self,
+        Parameters(args): Parameters<RunScriptInPlayMode>,
+    ) -> Result<CallToolResult, ErrorData> {
+        self.generic_tool_run(ToolArgumentValues::RunScriptInPlayMode(args))
+            .await
+    }
+
+    #[tool(
+        description = "Get the current studio mode. Returns the studio mode. The result will be one of start_play, run_server, or stop."
+    )]
+    async fn get_studio_mode(
+        &self,
+        Parameters(args): Parameters<GetStudioMode>,
+    ) -> Result<CallToolResult, ErrorData> {
+        self.generic_tool_run(ToolArgumentValues::GetStudioMode(args))
             .await
     }
 
