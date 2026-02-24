@@ -1,8 +1,8 @@
-use crate::error::Result;
+use crate::error::{Report, Result};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::{extract::State, Json};
-use color_eyre::eyre::{Error, OptionExt};
+use color_eyre::eyre::{eyre, Error, OptionExt};
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{
@@ -29,6 +29,7 @@ pub struct ToolArguments {
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct RunCommandResponse {
+    success: bool,
     response: String,
     id: Uuid,
 }
@@ -88,7 +89,11 @@ impl ServerHandler for RBXStudioServer {
                 website_url: None,
             },
             instructions: Some(
-                "User run_command to query data from Roblox Studio place or to change it"
+                "You must aware of current studio mode before using any tools, infer the mode from conversation context or get_studio_mode.
+User run_code to query data from Roblox Studio place or to change it
+After calling run_script_in_play_mode, the datamodel status will be reset to stop mode.
+Prefer using start_stop_play tool instead run_script_in_play_mode, Only used run_script_in_play_mode to run one time unit test code on server datamodel.
+"
                     .to_string(),
             ),
         }
@@ -192,7 +197,10 @@ impl RBXStudioServer {
 
     #[tool(
         description = "Run a script in play mode and automatically stop play after script finishes or timeout. Returns the output of the script.
-        Result format: { success: boolean, value: string, error: string, logs: { level: string, message: string, ts: number }[], errors: { level: string, message: string, ts: number }[], duration: number, isTimeout: boolean }"
+        Result format: { success: boolean, value: string, error: string, logs: { level: string, message: string, ts: number }[], errors: { level: string, message: string, ts: number }[], duration: number, isTimeout: boolean }.
+        - Prefer using start_stop_play tool instead run_script_in_play_mode, Only used run_script_in_play_mode to run one time unit test code on server datamodel.
+        - After calling run_script_in_play_mode, the datamodel status will be reset to stop mode.
+        - If It returns `StudioTestService: Previous call to start play session has not been completed`, call start_stop_play tool to stop play mode first then try it again."
     )]
     async fn run_script_in_play_mode(
         &self,
@@ -275,7 +283,12 @@ pub async fn response_handler(
         .output_map
         .remove(&payload.id)
         .ok_or_eyre("Unknown ID")?;
-    Ok(tx.send(Ok(payload.response))?)
+    let result: Result<String, Report> = if payload.success {
+        Ok(payload.response)
+    } else {
+        Err(Report::from(eyre!(payload.response)))
+    };
+    Ok(tx.send(result)?)
 }
 
 pub async fn proxy_handler(
@@ -290,13 +303,21 @@ pub async fn proxy_handler(
         state.process_queue.push_back(command);
         state.output_map.insert(id, tx);
     }
-    let response = rx.recv().await.ok_or_eyre("Couldn't receive response")??;
+    let result = rx.recv().await.ok_or_eyre("Couldn't receive response")?;
     {
         let mut state = state.lock().await;
         state.output_map.remove_entry(&id);
     }
-    tracing::debug!("Sending back to dud: {response:?}");
-    Ok(Json(RunCommandResponse { response, id }))
+    let (success, response) = match result {
+        Ok(s) => (true, s),
+        Err(e) => (false, e.to_string()),
+    };
+    tracing::debug!("Sending back to dud: success={success}, response={response:?}");
+    Ok(Json(RunCommandResponse {
+        success,
+        response,
+        id,
+    }))
 }
 
 pub async fn dud_proxy_loop(state: PackedState, exit: Receiver<()>) {
