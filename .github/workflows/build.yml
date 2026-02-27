@@ -24,7 +24,7 @@ jobs:
         id: get_version
         run: |
           git remote add upstream https://github.com/Roblox/studio-rust-mcp-server.git
-          git fetch upstream --tags
+          git fetch upstream --tags --force
           # Get the latest accessible tag from upstream/main
           VERSION_TAG=$(git describe --tags --abbrev=0 upstream/main 2>/dev/null || echo "v0.0.0")
           # Remove 'v' prefix
