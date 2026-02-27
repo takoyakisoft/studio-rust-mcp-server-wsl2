@@ -17,7 +17,7 @@ jobs:
         with:
           ref: linux-wsl2-build
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT }}
 
       - name: Configure Git
         run: |
@@ -31,37 +31,29 @@ jobs:
 
       - name: Merge Upstream Changes
         run: |
-          # Prioritize local changes for GitHub Workflow files (ours)
-          git checkout linux-wsl2-build .github/workflows/build.yml
-          git checkout linux-wsl2-build .github/workflows/checks.yml
-          git checkout linux-wsl2-build README.md
-
-          # Attempt merge to incorporate upstream changes for other files
-          # If conflicts occur, prioritize our changes (Workflow settings) while incorporating code changes
-          # We use a strategy to merge excluding specific files or choosing 'ours' on conflict
-
           echo "Merging upstream/main into linux-wsl2-build..."
 
-          # Execute merge. Even if conflicts occur, specified files will be overwritten/fixed later
+          # Execute merge without auto-commit
           set +e # Do not stop on error
           git merge upstream/main --no-commit --no-ff
           MERGE_EXIT_CODE=$?
           set -e
 
+          # ALWAYS restore our versions of README.md and the .github directory
+          # Unstage any changes to these paths
+          git reset HEAD .github README.md || true
+
+          # Checkout our versions
+          git checkout HEAD -- .github README.md || true
+
+          # Clean any new files upstream might have added to .github
+          git clean -fd .github || true
+
           if [ $MERGE_EXIT_CODE -ne 0 ]; then
              echo "Merge conflict detected. resolving..."
-             # Resolving conflicts: keep our version of build.yml and checks.yml
-             git checkout HEAD -- .github/workflows/build.yml || true
-             git checkout HEAD -- .github/workflows/checks.yml || true
-             git checkout HEAD -- README.md || true
              
-             # Treat other file conflicts as errors (manual intervention required)
-             # Conflicts outside of Workflow files are expected to be rare
-             # If they occur, auto-commit isn't possible, so we try to add and commit here
-             
-             git add .github/workflows/build.yml
-             git add .github/workflows/checks.yml
-             git add README.md
+             # Mark our restored versions as resolved
+             git add .github README.md || true
              
              # Check if any other conflicts remain
              if git diff --name-only --diff-filter=U | grep .; then
